@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bảng điều khiển — Quản trị VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="logo">Việt<span>Tour</span></div>
+    <ul class="admin-nav" id="admin-nav"></ul>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <h1 style="margin:0">Tổng quan</h1>
+      <div class="nav-auth" id="user-menu" style="display:flex">
+        <span id="user-greeting"></span>
+        <button class="btn btn-outline btn-sm" id="logout-btn">Đăng xuất</button>
+      </div>
+    </div>
+
+    <div class="stat-cards">
+      <div class="stat-card"><div class="num" id="stat-tours">–</div><div class="label">Tổng số tour</div></div>
+      <div class="stat-card"><div class="num" id="stat-guides">–</div><div class="label">Hướng dẫn viên</div></div>
+      <div class="stat-card"><div class="num" id="stat-bookings">–</div><div class="label">Đơn đặt tour</div></div>
+      <div class="stat-card"><div class="num" id="stat-pending">–</div><div class="label">Đơn chờ xác nhận</div></div>
+    </div>
+
+    <div class="admin-panel">
+      <h3>Đơn đặt tour gần đây</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Khách hàng</th><th>Tour</th><th>Số khách</th><th>Tổng tiền</th><th>Trạng thái</th></tr>
+          </thead>
+          <tbody id="recent-bookings">
+            <tr><td colspan="5">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+requireStaff();
+renderAdminNav('/admin/dashboard.html');
+
+const statusLabels = { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', cancelled: 'Đã hủy' };
+
+async function loadDashboard() {
+  try {
+    const [tours, guides, bookings] = await Promise.all([
+      apiRequest('/tours'),
+      apiRequest('/guides'),
+      apiRequest('/bookings'),
+    ]);
+
+    document.getElementById('stat-tours').textContent = tours.length;
+    document.getElementById('stat-guides').textContent = guides.length;
+    document.getElementById('stat-bookings').textContent = bookings.length;
+    document.getElementById('stat-pending').textContent = bookings.filter(b => b.status === 'pending').length;
+
+    const recent = bookings.slice(0, 8);
+    const tbody = document.getElementById('recent-bookings');
+    tbody.innerHTML = recent.length === 0
+      ? '<tr><td colspan="5">Chưa có đơn đặt tour nào.</td></tr>'
+      : recent.map(b => `
+          <tr>
+            <td>${b.customer_name}</td>
+            <td>${b.tour_name}</td>
+            <td>${b.num_people}</td>
+            <td>${formatMoney(b.total_price)}</td>
+            <td><span class="status-badge status-${b.status}">${statusLabels[b.status]}</span></td>
+          </tr>
+        `).join('');
+  } catch (err) {
+    document.getElementById('recent-bookings').innerHTML = `<tr><td colspan="5">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

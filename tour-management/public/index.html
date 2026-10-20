@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VietTour — Đặt tour du lịch trong nước</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar">
+    <a href="/index.html" class="logo">Việt<span>Tour</span></a>
+    <ul class="nav-links">
+      <li><a href="/index.html" class="active">Trang chủ</a></li>
+      <li><a href="/tours.html">Tour du lịch</a></li>
+      <li><a href="/my-bookings.html" id="nav-bookings-link" style="display:none">Tour đã đặt</a></li>
+      <li><a href="/admin/dashboard.html" id="nav-admin-link" style="display:none">Quản trị</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth-guest">
+      <a href="/login.html" class="btn btn-outline btn-sm">Đăng nhập</a>
+      <a href="/register.html" class="btn btn-primary btn-sm">Đăng ký</a>
+    </div>
+    <div class="nav-auth" id="user-menu">
+      <span id="user-greeting"></span>
+      <button class="btn btn-outline btn-sm" id="logout-btn">Đăng xuất</button>
+    </div>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <h1>Xách vali lên<br>và đi khắp Việt Nam</h1>
+      <p class="lead">Từ vịnh biển miền Bắc đến cao nguyên Đà Lạt, chọn tour phù hợp và để chúng tôi lo phần còn lại.</p>
+      <a href="/tours.html" class="btn btn-accent">Xem tất cả tour</a>
+      <div class="hero-stats">
+        <div><strong id="stat-tours">–</strong><span>Tour đang mở</span></div>
+        <div><strong>63</strong><span>Tỉnh thành</span></div>
+        <div><strong>4.8/5</strong><span>Đánh giá khách hàng</span></div>
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true"></div>
+  </div>
+</section>
+
+<div class="container">
+  <div class="search-bar">
+    <input type="text" id="home-search" placeholder="Tìm theo tên tour hoặc điểm đến, ví dụ: Hạ Long, Đà Lạt...">
+    <button class="btn btn-primary" id="home-search-btn">Tìm tour</button>
+  </div>
+</div>
+
+<section class="section container">
+  <div class="section-head">
+    <div>
+      <h2>Tour nổi bật</h2>
+      <p>Những hành trình được khách hàng lựa chọn nhiều nhất trong tháng này.</p>
+    </div>
+    <a href="/tours.html">Xem tất cả →</a>
+  </div>
+  <div class="tour-grid" id="featured-tours">
+    <p>Đang tải danh sách tour...</p>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>© 2026 VietTour. Đồ án môn học — Quản lý du lịch.</div>
+    <div><a href="/tours.html">Tour du lịch</a></div>
+  </div>
+</footer>
+
+<script src="/js/common.js"></script>
+<script>
+async function loadFeaturedTours() {
+  const wrap = document.getElementById('featured-tours');
+  try {
+    const tours = await apiRequest('/tours?status=active');
+    document.getElementById('stat-tours').textContent = tours.length;
+
+    if (tours.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">Hiện chưa có tour nào. Vui lòng quay lại sau.</div>';
+      return;
+    }
+
+    const featured = tours.slice(0, 6);
+    wrap.innerHTML = featured.map(tourCardHTML).join('');
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state">Không tải được danh sách tour: ${err.message}<br><br>Kiểm tra lại server / kết nối MySQL nhé.</div>`;
+  }
+}
+
+function tourCardHTML(t) {
+  return `
+    <div class="tour-card">
+      <div class="tour-card-img">
+        ${t.image_url ? `<img src="${t.image_url}" alt="${t.name}" loading="lazy" onerror="this.remove()">` : ''}
+        <div class="tour-card-price">${formatMoney(t.price)}</div>
+      </div>
+      <div class="tour-card-body">
+        <div class="tour-card-dest">${t.destination}</div>
+        <h3>${t.name}</h3>
+        <div class="tour-card-meta">
+          <span>🗓 ${t.duration_days} ngày</span>
+          <span>👥 Tối đa ${t.max_people} người</span>
+        </div>
+        <a href="/tour-detail.html?id=${t.id}" class="btn btn-primary btn-block">Xem chi tiết</a>
+      </div>
+    </div>
+  `;
+}
+
+document.getElementById('home-search-btn').addEventListener('click', () => {
+  const kw = document.getElementById('home-search').value.trim();
+  window.location.href = kw ? `/tours.html?keyword=${encodeURIComponent(kw)}` : '/tours.html';
+});
+document.getElementById('home-search').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('home-search-btn').click();
+});
+
+loadFeaturedTours();
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản lý Tour — Quản trị VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="logo">Việt<span>Tour</span></div>
+    <ul class="admin-nav" id="admin-nav"></ul>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <h1 style="margin:0">Quản lý Tour</h1>
+      <button class="btn btn-accent" id="btn-add-tour">+ Thêm tour mới</button>
+    </div>
+
+    <div class="admin-panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tên tour</th><th>Điểm đến</th><th>Giá</th><th>Số ngày</th>
+              <th>HDV</th><th>Trạng thái</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tour-table-body">
+            <tr><td colspan="7">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL THÊM / SỬA TOUR -->
+<div class="modal-overlay" id="tour-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-title" style="margin:0">Thêm tour mới</h2>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div id="modal-alert" class="alert"></div>
+
+    <form id="tour-form">
+      <input type="hidden" id="tour-id">
+
+      <label for="name">Tên tour</label>
+      <input type="text" id="name" required placeholder="VD: Khám phá Vịnh Hạ Long">
+
+      <div class="form-row-2">
+        <div>
+          <label for="destination">Điểm đến</label>
+          <input type="text" id="destination" required placeholder="VD: Quảng Ninh">
+        </div>
+        <div>
+          <label for="guide_id">Hướng dẫn viên</label>
+          <select id="guide_id"></select>
+        </div>
+      </div>
+
+      <label for="description">Mô tả</label>
+      <textarea id="description" rows="3" placeholder="Giới thiệu ngắn về tour..."></textarea>
+
+      <label for="image_url">Link ảnh tour</label>
+      <input type="text" id="image_url" placeholder="https://... (dán link ảnh, hoặc /img/ten-file.jpg nếu để ảnh trong thư mục public/img)">
+      <div class="field-hint">Để trống nếu chưa có ảnh — hệ thống sẽ dùng nền màu mặc định.</div>
+
+      <div class="form-row-2">
+        <div>
+          <label for="price">Giá / khách (VNĐ)</label>
+          <input type="number" id="price" required min="0" placeholder="3500000">
+        </div>
+        <div>
+          <label for="duration_days">Số ngày</label>
+          <input type="number" id="duration_days" required min="1" placeholder="3">
+        </div>
+      </div>
+
+      <div class="form-row-2">
+        <div>
+          <label for="max_people">Số chỗ tối đa</label>
+          <input type="number" id="max_people" required min="1" placeholder="20">
+        </div>
+        <div>
+          <label for="start_date">Ngày khởi hành</label>
+          <input type="date" id="start_date">
+        </div>
+      </div>
+
+      <label for="status">Trạng thái</label>
+      <select id="status">
+        <option value="active">Đang mở bán</option>
+        <option value="inactive">Tạm ngừng</option>
+      </select>
+
+      <label>Lịch trình chi tiết</label>
+      <div class="schedule-editor" id="schedule-editor"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="add-day-btn" style="margin-top:6px">+ Thêm ngày</button>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:22px">Lưu tour</button>
+    </form>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+requireStaff();
+renderAdminNav('/admin/tours.html');
+
+let allGuides = [];
+let editingTourId = null;
+
+async function loadGuideOptions() {
+  allGuides = await apiRequest('/guides');
+  const select = document.getElementById('guide_id');
+  select.innerHTML = '<option value="">-- Chưa chọn --</option>' +
+    allGuides.map(g => `<option value="${g.id}">${g.full_name}</option>`).join('');
+}
+
+async function loadTours() {
+  const tbody = document.getElementById('tour-table-body');
+  try {
+    const tours = await apiRequest('/tours');
+    tbody.innerHTML = tours.length === 0
+      ? '<tr><td colspan="7">Chưa có tour nào.</td></tr>'
+      : tours.map(t => `
+          <tr>
+            <td>${t.name}</td>
+            <td>${t.destination}</td>
+            <td>${formatMoney(t.price)}</td>
+            <td>${t.duration_days} ngày</td>
+            <td>${t.guide_name || '—'}</td>
+            <td><span class="status-badge ${t.status === 'active' ? 'status-confirmed' : 'status-cancelled'}">${t.status === 'active' ? 'Đang mở' : 'Tạm ngừng'}</span></td>
+            <td class="table-actions">
+              <button class="btn btn-outline btn-sm" data-edit="${t.id}">Sửa</button>
+              <button class="btn btn-danger btn-sm" data-delete="${t.id}">Xóa</button>
+            </td>
+          </tr>
+        `).join('');
+
+    document.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEditModal(btn.dataset.edit)));
+    document.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => deleteTour(btn.dataset.delete)));
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+function addDayRow(day_number = null, title = '', description = '') {
+  const container = document.getElementById('schedule-editor');
+  const n = day_number || container.children.length + 1;
+  const row = document.createElement('div');
+  row.className = 'day-row';
+  row.innerHTML = `
+    <div style="padding-top:10px; font-weight:700; color:var(--color-primary)">Ngày ${n}</div>
+    <div>
+      <input type="text" class="day-title" placeholder="Tiêu đề ngày ${n}" value="${title}">
+      <textarea class="day-desc" rows="2" placeholder="Mô tả hoạt động trong ngày...">${description}</textarea>
+      <button type="button" class="btn btn-danger btn-sm remove-day">Xóa ngày này</button>
+    </div>
+  `;
+  row.querySelector('.remove-day').addEventListener('click', () => {
+    row.remove();
+    renumberDays();
+  });
+  container.appendChild(row);
+}
+
+function renumberDays() {
+  const rows = document.querySelectorAll('#schedule-editor .day-row');
+  rows.forEach((row, i) => {
+    row.querySelector('div').textContent = `Ngày ${i + 1}`;
+  });
+}
+
+document.getElementById('add-day-btn').addEventListener('click', () => addDayRow());
+
+function openAddModal() {
+  editingTourId = null;
+  document.getElementById('modal-title').textContent = 'Thêm tour mới';
+  document.getElementById('tour-form').reset();
+  document.getElementById('schedule-editor').innerHTML = '';
+  addDayRow(1);
+  document.getElementById('modal-alert').className = 'alert';
+  document.getElementById('tour-modal').classList.add('show');
+}
+
+async function openEditModal(id) {
+  try {
+    const t = await apiRequest(`/tours/${id}`);
+    editingTourId = id;
+    document.getElementById('modal-title').textContent = 'Sửa tour';
+    document.getElementById('name').value = t.name;
+    document.getElementById('destination').value = t.destination;
+    document.getElementById('description').value = t.description || '';
+    document.getElementById('image_url').value = t.image_url || '';
+    document.getElementById('price').value = t.price;
+    document.getElementById('duration_days').value = t.duration_days;
+    document.getElementById('max_people').value = t.max_people;
+    document.getElementById('start_date').value = t.start_date ? t.start_date.substring(0, 10) : '';
+    document.getElementById('status').value = t.status;
+    document.getElementById('guide_id').value = t.guide_id || '';
+
+    document.getElementById('schedule-editor').innerHTML = '';
+    if (t.schedule.length > 0) {
+      t.schedule.forEach(d => addDayRow(d.day_number, d.title, d.description));
+    } else {
+      addDayRow(1);
+    }
+
+    document.getElementById('modal-alert').className = 'alert';
+    document.getElementById('tour-modal').classList.add('show');
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+function closeModal() {
+  document.getElementById('tour-modal').classList.remove('show');
+}
+
+document.getElementById('btn-add-tour').addEventListener('click', openAddModal);
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('tour-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'tour-modal') closeModal();
+});
+
+document.getElementById('tour-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const alertEl = document.getElementById('modal-alert');
+
+  const schedule = Array.from(document.querySelectorAll('#schedule-editor .day-row')).map((row, i) => ({
+    day_number: i + 1,
+    title: row.querySelector('.day-title').value,
+    description: row.querySelector('.day-desc').value,
+  }));
+
+  const payload = {
+    name: document.getElementById('name').value.trim(),
+    destination: document.getElementById('destination').value.trim(),
+    description: document.getElementById('description').value.trim(),
+    image_url: document.getElementById('image_url').value.trim() || null,
+    price: Number(document.getElementById('price').value),
+    duration_days: Number(document.getElementById('duration_days').value),
+    max_people: Number(document.getElementById('max_people').value),
+    start_date: document.getElementById('start_date').value || null,
+    status: document.getElementById('status').value,
+    guide_id: document.getElementById('guide_id').value || null,
+    schedule,
+  };
+
+  try {
+    if (editingTourId) {
+      await apiRequest(`/tours/${editingTourId}`, 'PUT', payload);
+    } else {
+      await apiRequest('/tours', 'POST', payload);
+    }
+    closeModal();
+    loadTours();
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  }
+});
+
+async function deleteTour(id) {
+  if (!confirm('Xóa tour này? Hành động không thể hoàn tác.')) return;
+  try {
+    await apiRequest(`/tours/${id}`, 'DELETE');
+    loadTours();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+(async function init() {
+  await loadGuideOptions();
+  await loadTours();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tài khoản của tôi — VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar">
+    <a href="/index.html" class="logo">Việt<span>Tour</span></a>
+    <ul class="nav-links">
+      <li><a href="/index.html">Trang chủ</a></li>
+      <li><a href="/tours.html">Tour du lịch</a></li>
+      <li><a href="/my-bookings.html" id="nav-bookings-link" style="display:none">Tour đã đặt</a></li>
+      <li><a href="/admin/dashboard.html" id="nav-admin-link" style="display:none">Quản trị</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth-guest">
+      <a href="/login.html" class="btn btn-outline btn-sm">Đăng nhập</a>
+      <a href="/register.html" class="btn btn-primary btn-sm">Đăng ký</a>
+    </div>
+    <div class="nav-auth" id="user-menu">
+      <span id="user-greeting"></span>
+      <button class="btn btn-outline btn-sm" id="logout-btn">Đăng xuất</button>
+    </div>
+  </nav>
+</header>
+
+<section class="section container" style="max-width:640px">
+  <h1>Tài khoản của tôi</h1>
+
+  <div class="admin-panel" style="margin-bottom:28px">
+    <h3>Thông tin cá nhân</h3>
+    <div id="info-alert" class="alert"></div>
+    <form id="info-form">
+      <label for="email">Email đăng nhập</label>
+      <input type="email" id="email" disabled>
+
+      <label for="role">Vai trò</label>
+      <input type="text" id="role" disabled>
+
+      <label for="full_name">Họ và tên</label>
+      <input type="text" id="full_name" required>
+
+      <label for="phone">Số điện thoại</label>
+      <input type="tel" id="phone">
+
+      <button type="submit" class="btn btn-primary" style="margin-top:20px">Lưu thông tin</button>
+    </form>
+  </div>
+
+  <div class="admin-panel">
+    <h3>Đổi mật khẩu</h3>
+    <div id="pw-alert" class="alert"></div>
+    <form id="pw-form">
+      <label for="old_password">Mật khẩu hiện tại</label>
+      <input type="password" id="old_password" required>
+
+      <label for="new_password">Mật khẩu mới</label>
+      <input type="password" id="new_password" required minlength="6" placeholder="Tối thiểu 6 ký tự">
+
+      <label for="confirm_password">Nhập lại mật khẩu mới</label>
+      <input type="password" id="confirm_password" required minlength="6">
+
+      <button type="submit" class="btn btn-primary" style="margin-top:20px">Đổi mật khẩu</button>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>© 2026 VietTour. Đồ án môn học — Quản lý du lịch.</div>
+    <div><a href="/tours.html">Tour du lịch</a></div>
+  </div>
+</footer>
+
+<script src="/js/common.js"></script>
+<script>
+requireLogin();
+
+async function loadProfile() {
+  try {
+    const me = await apiRequest('/auth/me');
+    document.getElementById('email').value = me.email;
+    document.getElementById('role').value = roleLabel(me.role);
+    document.getElementById('full_name').value = me.full_name;
+    document.getElementById('phone').value = me.phone || '';
+  } catch (err) {
+    showAlert(document.getElementById('info-alert'), err.message, 'error');
+  }
+}
+
+document.getElementById('info-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const alertEl = document.getElementById('info-alert');
+  try {
+    const full_name = document.getElementById('full_name').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const res = await apiRequest('/auth/me', 'PUT', { full_name, phone });
+    // cập nhật tên hiển thị trên thanh điều hướng
+    const user = getCurrentUser();
+    user.full_name = res.full_name;
+    localStorage.setItem('user', JSON.stringify(user));
+    renderNavAuth();
+    showAlert(alertEl, res.message, 'success');
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  }
+});
+
+document.getElementById('pw-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const alertEl = document.getElementById('pw-alert');
+  const old_password = document.getElementById('old_password').value;
+  const new_password = document.getElementById('new_password').value;
+  const confirm_password = document.getElementById('confirm_password').value;
+
+  if (new_password !== confirm_password) {
+    showAlert(alertEl, 'Mật khẩu nhập lại không khớp.', 'error');
+    return;
+  }
+  try {
+    const res = await apiRequest('/auth/change-password', 'PUT', { old_password, new_password });
+    showAlert(alertEl, res.message, 'success');
+    document.getElementById('pw-form').reset();
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  }
+});
+
+loadProfile();
+</script>
+</body>
+</html>

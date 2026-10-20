@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chi tiết tour — VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar">
+    <a href="/index.html" class="logo">Việt<span>Tour</span></a>
+    <ul class="nav-links">
+      <li><a href="/index.html">Trang chủ</a></li>
+      <li><a href="/tours.html" class="active">Tour du lịch</a></li>
+      <li><a href="/my-bookings.html" id="nav-bookings-link" style="display:none">Tour đã đặt</a></li>
+      <li><a href="/admin/dashboard.html" id="nav-admin-link" style="display:none">Quản trị</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth-guest">
+      <a href="/login.html" class="btn btn-outline btn-sm">Đăng nhập</a>
+      <a href="/register.html" class="btn btn-primary btn-sm">Đăng ký</a>
+    </div>
+    <div class="nav-auth" id="user-menu">
+      <span id="user-greeting"></span>
+      <button class="btn btn-outline btn-sm" id="logout-btn">Đăng xuất</button>
+    </div>
+  </nav>
+</header>
+
+<div id="tour-content">
+  <!-- Nội dung tour sẽ được JS chèn vào đây -->
+  <div class="container" style="padding: 60px 24px;"><p>Đang tải thông tin tour...</p></div>
+</div>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>© 2026 VietTour. Đồ án môn học — Quản lý du lịch.</div>
+    <div><a href="/tours.html">Tour du lịch</a></div>
+  </div>
+</footer>
+
+<script src="/js/common.js"></script>
+<script>
+const tourId = new URLSearchParams(window.location.search).get('id');
+let currentTour = null;
+
+async function loadTourDetail() {
+  const contentEl = document.getElementById('tour-content');
+  if (!tourId) {
+    contentEl.innerHTML = '<div class="container" style="padding:60px 24px"><p>Không tìm thấy tour.</p></div>';
+    return;
+  }
+
+  try {
+    currentTour = await apiRequest(`/tours/${tourId}`);
+    renderTour(currentTour);
+  } catch (err) {
+    contentEl.innerHTML = `<div class="container" style="padding:60px 24px"><p>Lỗi: ${err.message}</p></div>`;
+  }
+}
+
+function renderTour(t) {
+  const scheduleHTML = t.schedule.length > 0
+    ? t.schedule.map(d => `
+        <div class="schedule-day">
+          <div class="day-num">${String(d.day_number).padStart(2, '0')}</div>
+          <div>
+            <h4>${d.title || 'Ngày ' + d.day_number}</h4>
+            <p>${d.description || ''}</p>
+          </div>
+        </div>
+      `).join('')
+    : '<p>Lịch trình chi tiết đang được cập nhật.</p>';
+
+  const guideHTML = t.guide_name ? `
+    <div class="guide-mini">
+      <div class="guide-avatar">${t.guide_image ? `<img src="${t.guide_image}" alt="${t.guide_name}" onerror="this.remove()">` : ''}</div>
+      <div>
+        <strong>${t.guide_name}</strong>
+        <div style="font-size:0.85rem;color:var(--color-ink-soft)">${t.guide_bio ? t.guide_bio.substring(0, 60) + '…' : 'Hướng dẫn viên đồng hành cùng bạn'}</div>
+      </div>
+    </div>
+  ` : '';
+
+  document.getElementById('tour-content').innerHTML = `
+    <div class="tour-detail-header">
+      <div class="container">
+        <div class="breadcrumb"><a href="/index.html">Trang chủ</a> / <a href="/tours.html">Tour du lịch</a> / ${t.name}</div>
+        <div class="dest-tag">${t.destination}</div>
+        <h1>${t.name}</h1>
+      </div>
+    </div>
+
+    <div class="container">
+      ${t.image_url ? `
+        <div class="tour-detail-banner">
+          <img src="${t.image_url}" alt="${t.name}" onerror="this.parentElement.style.display='none'">
+        </div>
+      ` : ''}
+
+      <div class="tour-detail-grid">
+        <div>
+          <div class="info-pill-row">
+            <div class="info-pill"><strong>${t.duration_days} ngày</strong>Thời lượng</div>
+            <div class="info-pill"><strong>${t.max_people} người</strong>Số chỗ tối đa</div>
+            <div class="info-pill"><strong>${formatDate(t.start_date)}</strong>Ngày khởi hành</div>
+          </div>
+
+          <h2>Giới thiệu tour</h2>
+          <p>${t.description || 'Đang cập nhật mô tả chi tiết.'}</p>
+
+          <h2 style="margin-top:36px">Lịch trình chi tiết</h2>
+          <div>${scheduleHTML}</div>
+        </div>
+
+        <div class="booking-box">
+          <div class="price">${formatMoney(t.price)} <span>/ khách</span></div>
+          <p style="font-size:0.85rem;margin-bottom:0">Giá đã bao gồm ăn ở, di chuyển và hướng dẫn viên.</p>
+
+          <div id="booking-alert" class="alert"></div>
+
+          <form id="booking-form">
+            <label for="num-people">Số lượng khách</label>
+            <input type="number" id="num-people" min="1" max="${t.max_people}" value="1" required>
+
+            <label for="note">Ghi chú (không bắt buộc)</label>
+            <textarea id="note" rows="3" placeholder="Yêu cầu đặc biệt, số điện thoại liên hệ..."></textarea>
+
+            <div class="total-line">
+              <span>Tổng cộng</span>
+              <span id="total-price">${formatMoney(t.price)}</span>
+            </div>
+
+            <button type="submit" class="btn btn-accent btn-block" style="margin-top:18px">Đặt tour ngay</button>
+          </form>
+
+          ${guideHTML}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const numInput = document.getElementById('num-people');
+  numInput.addEventListener('input', () => {
+    const n = Math.max(1, Number(numInput.value) || 1);
+    document.getElementById('total-price').textContent = formatMoney(t.price * n);
+  });
+
+  document.getElementById('booking-form').addEventListener('submit', handleBooking);
+}
+
+async function handleBooking(e) {
+  e.preventDefault();
+  const alertEl = document.getElementById('booking-alert');
+
+  if (!isLoggedIn()) {
+    window.location.href = `/login.html?redirect=/tour-detail.html?id=${tourId}`;
+    return;
+  }
+
+  const num_people = Number(document.getElementById('num-people').value);
+  const note = document.getElementById('note').value;
+
+  try {
+    const res = await apiRequest('/bookings', 'POST', { tour_id: Number(tourId), num_people, note });
+    showAlert(alertEl, `${res.message} Tổng tiền: ${formatMoney(res.totalPrice)}`, 'success');
+    document.getElementById('booking-form').reset();
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  }
+}
+
+loadTourDetail();
+</script>
+</body>
+</html>

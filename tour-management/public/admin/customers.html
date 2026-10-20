@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Khách hàng — Quản trị VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="logo">Việt<span>Tour</span></div>
+    <ul class="admin-nav" id="admin-nav"></ul>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <h1 style="margin:0">Khách hàng</h1>
+      <input type="text" id="search" placeholder="Tìm theo tên, email, SĐT..." style="max-width:280px">
+    </div>
+
+    <div class="admin-panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Họ tên</th><th>Email</th><th>Điện thoại</th><th>Ngày đăng ký</th><th>Số đơn đã đặt</th></tr>
+          </thead>
+          <tbody id="customer-table-body">
+            <tr><td colspan="5">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+requireStaff();
+renderAdminNav('/admin/customers.html');
+
+let customers = [];
+
+function render() {
+  const kw = document.getElementById('search').value.trim().toLowerCase();
+  const list = customers.filter(c =>
+    !kw || [c.full_name, c.email, c.phone || ''].some(v => v.toLowerCase().includes(kw))
+  );
+  const tbody = document.getElementById('customer-table-body');
+  tbody.innerHTML = list.length === 0
+    ? '<tr><td colspan="5">Không có khách hàng nào.</td></tr>'
+    : list.map(c => `
+        <tr>
+          <td>${c.full_name}</td>
+          <td>${c.email}</td>
+          <td>${c.phone || '—'}</td>
+          <td>${formatDate(c.created_at)}</td>
+          <td>${c.total_bookings}</td>
+        </tr>
+      `).join('');
+}
+
+async function load() {
+  try {
+    customers = await apiRequest('/users/customers');
+    render();
+  } catch (err) {
+    document.getElementById('customer-table-body').innerHTML = `<tr><td colspan="5">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+document.getElementById('search').addEventListener('input', render);
+load();
+</script>
+</body>
+</html>

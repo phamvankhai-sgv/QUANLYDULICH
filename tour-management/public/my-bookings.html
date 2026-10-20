@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tour đã đặt — VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar">
+    <a href="/index.html" class="logo">Việt<span>Tour</span></a>
+    <ul class="nav-links">
+      <li><a href="/index.html">Trang chủ</a></li>
+      <li><a href="/tours.html">Tour du lịch</a></li>
+      <li><a href="/my-bookings.html" class="active" id="nav-bookings-link">Tour đã đặt</a></li>
+      <li><a href="/admin/dashboard.html" id="nav-admin-link" style="display:none">Quản trị</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth-guest">
+      <a href="/login.html" class="btn btn-outline btn-sm">Đăng nhập</a>
+      <a href="/register.html" class="btn btn-primary btn-sm">Đăng ký</a>
+    </div>
+    <div class="nav-auth" id="user-menu">
+      <span id="user-greeting"></span>
+      <button class="btn btn-outline btn-sm" id="logout-btn">Đăng xuất</button>
+    </div>
+  </nav>
+</header>
+
+<section class="section container">
+  <h1>Tour đã đặt</h1>
+  <p>Danh sách các tour bạn đã đặt và trạng thái xử lý.</p>
+
+  <div id="bookings-list" style="margin-top: 28px;">
+    <p>Đang tải...</p>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>© 2026 VietTour. Đồ án môn học — Quản lý du lịch.</div>
+    <div><a href="/tours.html">Tour du lịch</a></div>
+  </div>
+</footer>
+
+<script src="/js/common.js"></script>
+<script>
+requireLogin();
+
+const statusLabels = { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', cancelled: 'Đã hủy' };
+
+async function loadBookings() {
+  const wrap = document.getElementById('bookings-list');
+  try {
+    const bookings = await apiRequest('/bookings/my-bookings');
+    if (bookings.length === 0) {
+      wrap.innerHTML = `<div class="empty-state">Bạn chưa đặt tour nào. <br><br><a href="/tours.html" class="btn btn-primary" style="margin-top:12px">Khám phá tour ngay</a></div>`;
+      return;
+    }
+    wrap.innerHTML = bookings.map(bookingRowHTML).join('');
+
+    document.querySelectorAll('[data-cancel]').forEach(btn => {
+      btn.addEventListener('click', () => cancelBooking(btn.dataset.cancel));
+    });
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state">Lỗi: ${err.message}</div>`;
+  }
+}
+
+function bookingRowHTML(b) {
+  const cancelBtn = b.status === 'pending'
+    ? `<button class="btn btn-danger btn-sm" data-cancel="${b.id}">Hủy đơn</button>`
+    : '';
+  return `
+    <div class="booking-row">
+      <div class="thumb">${b.image_url ? `<img src="${b.image_url}" alt="${b.tour_name}" onerror="this.remove()">` : ''}</div>
+      <div class="info">
+        <h4>${b.tour_name}</h4>
+        <div class="meta">${b.destination} · ${b.num_people} khách · Khởi hành: ${formatDate(b.start_date)}</div>
+        <div class="meta">Tổng tiền: <strong>${formatMoney(b.total_price)}</strong></div>
+      </div>
+      <span class="status-badge status-${b.status}">${statusLabels[b.status]}</span>
+      ${cancelBtn}
+    </div>
+  `;
+}
+
+async function cancelBooking(id) {
+  if (!confirm('Bạn chắc chắn muốn hủy đơn đặt tour này?')) return;
+  try {
+    await apiRequest(`/bookings/${id}/cancel`, 'PUT');
+    loadBookings();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+loadBookings();
+</script>
+</body>
+</html>

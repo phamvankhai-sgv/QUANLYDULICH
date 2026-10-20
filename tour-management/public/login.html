@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng nhập — VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar">
+    <a href="/index.html" class="logo">Việt<span>Tour</span></a>
+    <ul class="nav-links">
+      <li><a href="/index.html">Trang chủ</a></li>
+      <li><a href="/tours.html">Tour du lịch</a></li>
+    </ul>
+    <div></div>
+  </nav>
+</header>
+
+<div class="auth-wrap">
+  <h1>Đăng nhập</h1>
+  <p>Đăng nhập để đặt tour và theo dõi lịch sử đặt tour của bạn.</p>
+
+  <div id="login-alert" class="alert"></div>
+
+  <form id="login-form">
+    <label for="email">Email</label>
+    <input type="email" id="email" required placeholder="ban@email.com">
+
+    <label for="password">Mật khẩu</label>
+    <input type="password" id="password" required placeholder="••••••••">
+
+    <button type="submit" class="btn btn-primary btn-block" style="margin-top:22px">Đăng nhập</button>
+  </form>
+
+  <div class="auth-switch">
+    Chưa có tài khoản? <a href="/register.html">Đăng ký ngay</a>
+  </div>
+
+  <div class="auth-switch" style="margin-top:6px; font-size:0.8rem;">
+    Admin mẫu: <strong>admin@tour.com</strong> / <strong>admin123</strong><br>
+    Nhân viên mẫu: <strong>nhanvien@tour.com</strong> / <strong>nhanvien123</strong>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const alertEl = document.getElementById('login-alert');
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  try {
+    const res = await apiRequest('/auth/login', 'POST', { email, password });
+    localStorage.setItem('token', res.token);
+    localStorage.setItem('user', JSON.stringify(res.user));
+
+    const redirect = new URLSearchParams(window.location.search).get('redirect');
+    if (res.user.role === 'admin' || res.user.role === 'staff') {
+      window.location.href = '/admin/dashboard.html';
+    } else {
+      window.location.href = redirect || '/index.html';
+    }
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  }
+});
+</script>
+</body>
+</html>

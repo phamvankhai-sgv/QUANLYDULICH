@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đơn đặt tour — Quản trị VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="logo">Việt<span>Tour</span></div>
+    <ul class="admin-nav" id="admin-nav"></ul>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <h1 style="margin:0">Đơn đặt tour</h1>
+      <select id="status-filter" style="max-width:220px">
+        <option value="">Tất cả trạng thái</option>
+        <option value="pending">Chờ xác nhận</option>
+        <option value="confirmed">Đã xác nhận</option>
+        <option value="cancelled">Đã hủy</option>
+      </select>
+    </div>
+
+    <div class="admin-panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Khách hàng</th><th>Tour</th><th>Số khách</th>
+              <th>Tổng tiền</th><th>Ngày đặt</th><th>Trạng thái</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="booking-table-body">
+            <tr><td colspan="7">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+requireStaff();
+renderAdminNav('/admin/bookings.html');
+
+const statusLabels = { pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận', cancelled: 'Đã hủy' };
+let allBookings = [];
+
+async function loadBookings() {
+  const tbody = document.getElementById('booking-table-body');
+  try {
+    allBookings = await apiRequest('/bookings');
+    renderTable();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+function renderTable() {
+  const filter = document.getElementById('status-filter').value;
+  const tbody = document.getElementById('booking-table-body');
+  const list = filter ? allBookings.filter(b => b.status === filter) : allBookings;
+
+  tbody.innerHTML = list.length === 0
+    ? '<tr><td colspan="7">Không có đơn đặt tour nào.</td></tr>'
+    : list.map(b => `
+        <tr>
+          <td>${b.customer_name}<br><span style="font-size:0.78rem;color:var(--color-ink-soft)">${b.customer_email}</span></td>
+          <td>${b.tour_name}</td>
+          <td>${b.num_people}</td>
+          <td>${formatMoney(b.total_price)}</td>
+          <td>${formatDate(b.created_at)}</td>
+          <td><span class="status-badge status-${b.status}">${statusLabels[b.status]}</span></td>
+          <td class="table-actions">
+            ${b.status === 'pending' ? `
+              <button class="btn btn-primary btn-sm" data-confirm="${b.id}">Xác nhận</button>
+              <button class="btn btn-danger btn-sm" data-cancel="${b.id}">Hủy</button>
+            ` : ''}
+          </td>
+        </tr>
+      `).join('');
+
+  document.querySelectorAll('[data-confirm]').forEach(btn => btn.addEventListener('click', () => updateStatus(btn.dataset.confirm, 'confirmed')));
+  document.querySelectorAll('[data-cancel]').forEach(btn => btn.addEventListener('click', () => updateStatus(btn.dataset.cancel, 'cancelled')));
+}
+
+async function updateStatus(id, status) {
+  try {
+    await apiRequest(`/bookings/${id}/status`, 'PUT', { status });
+    loadBookings();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+document.getElementById('status-filter').addEventListener('change', renderTable);
+
+loadBookings();
+</script>
+</body>
+</html>

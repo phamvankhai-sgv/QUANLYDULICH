@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tour du lịch — VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="navbar">
+    <a href="/index.html" class="logo">Việt<span>Tour</span></a>
+    <ul class="nav-links">
+      <li><a href="/index.html">Trang chủ</a></li>
+      <li><a href="/tours.html" class="active">Tour du lịch</a></li>
+      <li><a href="/my-bookings.html" id="nav-bookings-link" style="display:none">Tour đã đặt</a></li>
+      <li><a href="/admin/dashboard.html" id="nav-admin-link" style="display:none">Quản trị</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth-guest">
+      <a href="/login.html" class="btn btn-outline btn-sm">Đăng nhập</a>
+      <a href="/register.html" class="btn btn-primary btn-sm">Đăng ký</a>
+    </div>
+    <div class="nav-auth" id="user-menu">
+      <span id="user-greeting"></span>
+      <button class="btn btn-outline btn-sm" id="logout-btn">Đăng xuất</button>
+    </div>
+  </nav>
+</header>
+
+<section class="section container" style="padding-bottom: 20px;">
+  <h1>Danh sách tour du lịch</h1>
+  <p>Chọn hành trình phù hợp với bạn — lọc theo tên hoặc điểm đến.</p>
+  <div class="search-bar" style="margin-top: 24px;">
+    <input type="text" id="filter-keyword" placeholder="Tìm theo tên tour hoặc điểm đến...">
+    <button class="btn btn-primary" id="filter-btn">Lọc tour</button>
+  </div>
+</section>
+
+<section class="section container" style="padding-top: 20px;">
+  <div class="tour-grid" id="tour-list">
+    <p>Đang tải...</p>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>© 2026 VietTour. Đồ án môn học — Quản lý du lịch.</div>
+    <div><a href="/tours.html">Tour du lịch</a></div>
+  </div>
+</footer>
+
+<script src="/js/common.js"></script>
+<script>
+function tourCardHTML(t) {
+  return `
+    <div class="tour-card">
+      <div class="tour-card-img">
+        ${t.image_url ? `<img src="${t.image_url}" alt="${t.name}" loading="lazy" onerror="this.remove()">` : ''}
+        <div class="tour-card-price">${formatMoney(t.price)}</div>
+      </div>
+      <div class="tour-card-body">
+        <div class="tour-card-dest">${t.destination}</div>
+        <h3>${t.name}</h3>
+        <div class="tour-card-meta">
+          <span>🗓 ${t.duration_days} ngày</span>
+          <span>👥 Tối đa ${t.max_people} người</span>
+        </div>
+        <a href="/tour-detail.html?id=${t.id}" class="btn btn-primary btn-block">Xem chi tiết</a>
+      </div>
+    </div>
+  `;
+}
+
+async function loadTours(keyword = '') {
+  const wrap = document.getElementById('tour-list');
+  wrap.innerHTML = '<p>Đang tải...</p>';
+  try {
+    const query = keyword ? `?keyword=${encodeURIComponent(keyword)}&status=active` : '?status=active';
+    const tours = await apiRequest(`/tours${query}`);
+    if (tours.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">Không tìm thấy tour phù hợp.</div>';
+      return;
+    }
+    wrap.innerHTML = tours.map(tourCardHTML).join('');
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state">Lỗi tải danh sách tour: ${err.message}</div>`;
+  }
+}
+
+document.getElementById('filter-btn').addEventListener('click', () => {
+  loadTours(document.getElementById('filter-keyword').value.trim());
+});
+document.getElementById('filter-keyword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('filter-btn').click();
+});
+
+// Nếu có sẵn từ khóa trên URL (chuyển từ trang chủ sang)
+const urlParams = new URLSearchParams(window.location.search);
+const initialKeyword = urlParams.get('keyword') || '';
+if (initialKeyword) document.getElementById('filter-keyword').value = initialKeyword;
+loadTours(initialKeyword);
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn viên — Quản trị VietTour</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="logo">Việt<span>Tour</span></div>
+    <ul class="admin-nav" id="admin-nav"></ul>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <h1 style="margin:0">Hướng dẫn viên</h1>
+      <button class="btn btn-accent" id="btn-add-guide">+ Thêm hướng dẫn viên</button>
+    </div>
+
+    <div class="admin-panel">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Họ tên</th><th>Điện thoại</th><th>Email</th><th>Kinh nghiệm</th><th></th></tr>
+          </thead>
+          <tbody id="guide-table-body">
+            <tr><td colspan="5">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL THÊM / SỬA HƯỚNG DẪN VIÊN -->
+<div class="modal-overlay" id="guide-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-title" style="margin:0">Thêm hướng dẫn viên</h2>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div id="modal-alert" class="alert"></div>
+
+    <form id="guide-form">
+      <input type="hidden" id="guide-id">
+
+      <label for="full_name">Họ và tên</label>
+      <input type="text" id="full_name" required placeholder="Nguyễn Văn A">
+
+      <div class="form-row-2">
+        <div>
+          <label for="phone">Số điện thoại</label>
+          <input type="tel" id="phone" placeholder="09xxxxxxxx">
+        </div>
+        <div>
+          <label for="experience_years">Số năm kinh nghiệm</label>
+          <input type="number" id="experience_years" min="0" placeholder="5">
+        </div>
+      </div>
+
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="huongdanvien@email.com">
+
+      <label for="bio">Giới thiệu</label>
+      <textarea id="bio" rows="3" placeholder="Kinh nghiệm, thế mạnh, tuyến tour phụ trách..."></textarea>
+
+      <label for="image_url">Link ảnh đại diện</label>
+      <input type="text" id="image_url" placeholder="https://... (để trống sẽ dùng ảnh đại diện tự tạo theo tên)">
+      <div class="field-hint">Để trống, hệ thống sẽ tự tạo ảnh đại diện theo tên hướng dẫn viên.</div>
+
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:22px">Lưu thông tin</button>
+    </form>
+  </div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+requireStaff();
+renderAdminNav('/admin/guides.html');
+let editingGuideId = null;
+
+async function loadGuides() {
+  const tbody = document.getElementById('guide-table-body');
+  try {
+    const guides = await apiRequest('/guides');
+    tbody.innerHTML = guides.length === 0
+      ? '<tr><td colspan="5">Chưa có hướng dẫn viên nào.</td></tr>'
+      : guides.map(g => `
+          <tr>
+            <td>${g.full_name}</td>
+            <td>${g.phone || '—'}</td>
+            <td>${g.email || '—'}</td>
+            <td>${g.experience_years} năm</td>
+            <td class="table-actions">
+              <button class="btn btn-outline btn-sm" data-edit="${g.id}">Sửa</button>
+              <button class="btn btn-danger btn-sm" data-delete="${g.id}">Xóa</button>
+            </td>
+          </tr>
+        `).join('');
+
+    document.querySelectorAll('[data-edit]').forEach(btn => btn.addEventListener('click', () => openEditModal(btn.dataset.edit, guides)));
+    document.querySelectorAll('[data-delete]').forEach(btn => btn.addEventListener('click', () => deleteGuide(btn.dataset.delete)));
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5">Lỗi: ${err.message}</td></tr>`;
+  }
+}
+
+function openAddModal() {
+  editingGuideId = null;
+  document.getElementById('modal-title').textContent = 'Thêm hướng dẫn viên';
+  document.getElementById('guide-form').reset();
+  document.getElementById('modal-alert').className = 'alert';
+  document.getElementById('guide-modal').classList.add('show');
+}
+
+function openEditModal(id, guides) {
+  const g = guides.find(x => x.id == id);
+  editingGuideId = id;
+  document.getElementById('modal-title').textContent = 'Sửa thông tin hướng dẫn viên';
+  document.getElementById('full_name').value = g.full_name;
+  document.getElementById('phone').value = g.phone || '';
+  document.getElementById('email').value = g.email || '';
+  document.getElementById('experience_years').value = g.experience_years;
+  document.getElementById('bio').value = g.bio || '';
+  document.getElementById('image_url').value = g.image_url || '';
+  document.getElementById('modal-alert').className = 'alert';
+  document.getElementById('guide-modal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('guide-modal').classList.remove('show'); }
+document.getElementById('btn-add-guide').addEventListener('click', openAddModal);
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('guide-modal').addEventListener('click', (e) => { if (e.target.id === 'guide-modal') closeModal(); });
+
+document.getElementById('guide-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const alertEl = document.getElementById('modal-alert');
+  const payload = {
+    full_name: document.getElementById('full_name').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    experience_years: Number(document.getElementById('experience_years').value) || 0,
+    bio: document.getElementById('bio').value.trim(),
+    image_url: document.getElementById('image_url').value.trim() || null,
+  };
+
+  try {
+    if (editingGuideId) {
+      await apiRequest(`/guides/${editingGuideId}`, 'PUT', payload);
+    } else {
+      await apiRequest('/guides', 'POST', payload);
+    }
+    closeModal();
+    loadGuides();
+  } catch (err) {
+    showAlert(alertEl, err.message, 'error');
+  }
+});
+
+async function deleteGuide(id) {
+  if (!confirm('Xóa hướng dẫn viên này?')) return;
+  try {
+    await apiRequest(`/guides/${id}`, 'DELETE');
+    loadGuides();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+loadGuides();
+</script>
+</body>
+</html>
